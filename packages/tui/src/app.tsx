@@ -10,7 +10,6 @@ import {
 import { useSessions } from "./hooks/use-sessions.js";
 import { useSessionActions } from "./hooks/use-session-actions.js";
 import { useTmuxAttach } from "./hooks/use-tmux-attach.js";
-import { useTmuxCycle } from "./hooks/use-tmux-cycle.js";
 import { StatusBar } from "./components/status-bar.js";
 import { SessionTable } from "./components/session-table.js";
 import { SessionDetail } from "./components/session-detail.js";
@@ -27,7 +26,6 @@ export function App() {
   const { killSession, sendMessage, restoreSession, actionError, actionSuccess, clearFeedback } =
     useSessionActions();
   const { attach } = useTmuxAttach(refresh);
-  const { cycleNext } = useTmuxCycle();
 
   const [view, setView] = useState<View>("list");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -92,12 +90,6 @@ export function App() {
   useInput(
     (input, key) => {
       if (view === "message" || view === "confirm-kill" || view === "confirm-restore") {
-        return;
-      }
-
-      // Tab cycles between all tmux sessions (queries tmux directly)
-      if (key.tab) {
-        cycleNext();
         return;
       }
 

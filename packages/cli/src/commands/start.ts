@@ -282,6 +282,18 @@ function startTui(tuiDir: string, configPath: string | null): ChildProcess {
     { timeout: 10_000 },
   );
 
+  // Bind Tab at the tmux level to cycle sessions from anywhere.
+  // This works even when focus is in the orchestrator or a worker session.
+  // Uses switch-client -n (next session) so it cycles through all sessions.
+  // Save existing binding to restore on cleanup.
+  try {
+    execFileSync("tmux", ["bind-key", "-n", "Tab", "switch-client", "-n"], {
+      timeout: 5_000,
+    });
+  } catch {
+    // Non-fatal — Tab cycling in TUI still works
+  }
+
   // Attach to it — this blocks until the user detaches or TUI exits
   const child = spawn("tmux", ["attach-session", "-t", TUI_TMUX_SESSION], {
     stdio: "inherit",
@@ -291,6 +303,18 @@ function startTui(tuiDir: string, configPath: string | null): ChildProcess {
   child.on("error", (err) => {
     console.error(chalk.red("TUI failed to start:"), err.message);
     child.emit("exit", 1, null);
+  });
+
+  // Clean up the Tab binding when the TUI exits
+  child.on("exit", () => {
+    try {
+      execFileSync("tmux", ["unbind-key", "-n", "Tab"], {
+        timeout: 5_000,
+        stdio: "ignore",
+      });
+    } catch {
+      // tmux server may already be gone
+    }
   });
 
   return child;

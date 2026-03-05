@@ -80,6 +80,15 @@ export function registerDashboard(program: Command): void {
           { timeout: 10_000 },
         );
 
+        // Bind Tab at tmux level to cycle sessions from any session
+        try {
+          execFileSync("tmux", ["bind-key", "-n", "Tab", "switch-client", "-n"], {
+            timeout: 5_000,
+          });
+        } catch {
+          // Non-fatal
+        }
+
         const child = spawn("tmux", ["attach-session", "-t", tuiSessionName], {
           stdio: "inherit",
           detached: false,
@@ -89,6 +98,14 @@ export function registerDashboard(program: Command): void {
           process.exit(1);
         });
         child.on("exit", (code) => {
+          try {
+            execFileSync("tmux", ["unbind-key", "-n", "Tab"], {
+              timeout: 5_000,
+              stdio: "ignore",
+            });
+          } catch {
+            // tmux server may already be gone
+          }
           process.exit(code ?? 0);
         });
         return;
