@@ -182,3 +182,24 @@ export function findWebDir(): string {
     return candidates[0];
   }
 }
+
+/**
+ * Locate the @composio/ao-tui package directory.
+ */
+export function findTuiDir(): string {
+  try {
+    const pkgJson = require.resolve("@composio/ao-tui/package.json");
+    return resolve(pkgJson, "..");
+  } catch {
+    const candidates = [
+      resolve(__dirname, "../../../tui"),
+      resolve(__dirname, "../../../../packages/tui"),
+    ];
+    for (const candidate of candidates) {
+      if (existsSync(resolve(candidate, "package.json"))) {
+        return candidate;
+      }
+    }
+    return candidates[0];
+  }
+}
