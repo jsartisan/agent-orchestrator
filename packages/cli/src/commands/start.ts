@@ -282,16 +282,15 @@ function startTui(tuiDir: string, configPath: string | null): ChildProcess {
     { timeout: 10_000 },
   );
 
-  // Bind Tab at the tmux level to cycle sessions from anywhere.
-  // This works even when focus is in the orchestrator or a worker session.
-  // Uses switch-client -n (next session) so it cycles through all sessions.
-  // Save existing binding to restore on cleanup.
+  // Bind prefix+Tab at the tmux level to cycle sessions from anywhere.
+  // Uses prefix key (default Ctrl+B) so bare Tab still works for
+  // autocompletion in Claude Code and other programs.
   try {
-    execFileSync("tmux", ["bind-key", "-n", "Tab", "switch-client", "-n"], {
+    execFileSync("tmux", ["bind-key", "Tab", "switch-client", "-n"], {
       timeout: 5_000,
     });
   } catch {
-    // Non-fatal — Tab cycling in TUI still works
+    // Non-fatal
   }
 
   // Attach to it — this blocks until the user detaches or TUI exits
@@ -308,7 +307,7 @@ function startTui(tuiDir: string, configPath: string | null): ChildProcess {
   // Clean up the Tab binding when the TUI exits
   child.on("exit", () => {
     try {
-      execFileSync("tmux", ["unbind-key", "-n", "Tab"], {
+      execFileSync("tmux", ["unbind-key", "Tab"], {
         timeout: 5_000,
         stdio: "ignore",
       });
