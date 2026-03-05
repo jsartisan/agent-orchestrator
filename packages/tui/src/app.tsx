@@ -10,6 +10,7 @@ import {
 import { useSessions } from "./hooks/use-sessions.js";
 import { useSessionActions } from "./hooks/use-session-actions.js";
 import { useTmuxAttach } from "./hooks/use-tmux-attach.js";
+import { useTmuxCycle } from "./hooks/use-tmux-cycle.js";
 import { StatusBar } from "./components/status-bar.js";
 import { SessionTable } from "./components/session-table.js";
 import { SessionDetail } from "./components/session-detail.js";
@@ -26,6 +27,7 @@ export function App() {
   const { killSession, sendMessage, restoreSession, actionError, actionSuccess, clearFeedback } =
     useSessionActions();
   const { attach } = useTmuxAttach(refresh);
+  const { cycleNext } = useTmuxCycle();
 
   const [view, setView] = useState<View>("list");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -63,6 +65,20 @@ export function App() {
     ? isTerminal && !NON_RESTORABLE_STATUSES.has(selectedSession.status)
     : false;
 
+  // Build ordered list of tmux targets for Tab cycling
+  const tmuxCycleTargets = useMemo(() => {
+    const targets: string[] = [];
+    if (orchestratorTarget) {
+      targets.push(orchestratorTarget);
+    }
+    for (const s of sortedSessions) {
+      if (s.runtimeTarget && !TERMINAL_STATUSES.has(s.status)) {
+        targets.push(s.runtimeTarget);
+      }
+    }
+    return targets;
+  }, [orchestratorTarget, sortedSessions]);
+
   const handleSendMessage = useCallback(
     (sessionId: string, message: string) => {
       sendMessage(sessionId, message);
@@ -90,6 +106,12 @@ export function App() {
   useInput(
     (input, key) => {
       if (view === "message" || view === "confirm-kill" || view === "confirm-restore") {
+        return;
+      }
+
+      // Tab cycles between tmux windows (works in both list and detail views)
+      if (key.tab && tmuxCycleTargets.length > 0) {
+        cycleNext(tmuxCycleTargets);
         return;
       }
 
