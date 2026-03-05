@@ -30,7 +30,7 @@ import {
 } from "@composio/ao-core";
 import { exec, execSilent } from "../lib/shell.js";
 import { getSessionManager } from "../lib/create-session-manager.js";
-import { findWebDir, buildDashboardEnv, waitForPortAndOpen, isPortAvailable, findFreePort, MAX_PORT_SCAN } from "../lib/web-dir.js";
+import { findWebDir, findTuiDir, buildDashboardEnv, waitForPortAndOpen, isPortAvailable, findFreePort, MAX_PORT_SCAN } from "../lib/web-dir.js";
 import { cleanNextCache } from "../lib/dashboard-rebuild.js";
 import { preflight } from "../lib/preflight.js";
 
@@ -210,6 +210,31 @@ async function handleUrlStart(url: string): Promise<{ config: OrchestratorConfig
 }
 
 /**
+ * Start TUI dashboard in the foreground.
+ * Returns the child process handle for cleanup.
+ */
+function startTui(tuiDir: string, configPath: string | null): ChildProcess {
+  const env: Record<string, string> = { ...process.env } as Record<string, string>;
+  if (configPath) {
+    env["AO_CONFIG_PATH"] = configPath;
+  }
+
+  const child = spawn("node", ["dist/index.js"], {
+    cwd: tuiDir,
+    stdio: "inherit",
+    detached: false,
+    env,
+  });
+
+  child.on("error", (err) => {
+    console.error(chalk.red("TUI failed to start:"), err.message);
+    child.emit("exit", 1, null);
+  });
+
+  return child;
+}
+
+/**
  * Start dashboard server in the background.
  * Returns the child process handle for cleanup.
  */
@@ -246,10 +271,11 @@ async function runStartup(
   config: OrchestratorConfig,
   projectId: string,
   project: ProjectConfig,
-  opts?: { dashboard?: boolean; orchestrator?: boolean; rebuild?: boolean; autoPort?: boolean },
+  opts?: { dashboard?: boolean; orchestrator?: boolean; rebuild?: boolean; autoPort?: boolean; tui?: boolean },
 ): Promise<void> {
   const sessionId = `${project.sessionPrefix}-orchestrator`;
   let port = config.port ?? DEFAULT_PORT;
+  const useTui = opts?.tui ?? config.dashboard === "tui";
 
   console.log(chalk.bold(`\nStarting orchestrator for ${chalk.cyan(project.name)}\n`));
 
@@ -258,7 +284,47 @@ async function runStartup(
   let exists = false;
 
   // Start dashboard (unless --no-dashboard)
-  if (opts?.dashboard !== false) {
+  if (opts?.dashboard !== false && useTui) {
+    const tuiDir = findTuiDir();
+    if (!existsSync(resolve(tuiDir, "package.json"))) {
+      throw new Error("Could not find @composio/ao-tui package. Run: pnpm install");
+    }
+    if (!existsSync(resolve(tuiDir, "dist/index.js"))) {
+      throw new Error("@composio/ao-tui is not built. Run: pnpm build");
+    }
+
+    // Create orchestrator session first (before TUI takes over stdio)
+    if (opts?.orchestrator !== false) {
+      const sm = await getSessionManager(config);
+      const existing = await sm.get(sessionId);
+      exists = existing !== null && existing.status !== "killed";
+
+      if (exists) {
+        console.log(
+          chalk.yellow(
+            `Orchestrator session "${sessionId}" is already running (skipping creation)`,
+          ),
+        );
+      } else {
+        spinner.start("Creating orchestrator session");
+        const systemPrompt = generateOrchestratorPrompt({ config, projectId, project });
+        const session = await sm.spawnOrchestrator({ projectId, systemPrompt });
+        if (session.runtimeHandle?.id) {
+          // Store for summary but TUI doesn't need it
+        }
+        spinner.succeed("Orchestrator session created");
+      }
+    }
+
+    console.log(chalk.bold.green("\nLaunching TUI dashboard...\n"));
+    dashboardProcess = startTui(tuiDir, config.configPath);
+    dashboardProcess.on("exit", (code) => {
+      process.exit(code ?? 0);
+    });
+    return;
+  }
+
+  if (opts?.dashboard !== false && !useTui) {
     if (opts?.autoPort) {
       // Port was auto-selected during config generation — if it's now busy
       // (race condition), find another free port instead of erroring.
@@ -410,6 +476,7 @@ export function registerStart(program: Command): void {
     .option("--no-dashboard", "Skip starting the dashboard server")
     .option("--no-orchestrator", "Skip starting the orchestrator agent")
     .option("--rebuild", "Clean and rebuild dashboard before starting")
+    .option("--tui", "Use terminal UI dashboard instead of web dashboard")
     .action(
       async (
         projectArg?: string,
@@ -417,6 +484,7 @@ export function registerStart(program: Command): void {
           dashboard?: boolean;
           orchestrator?: boolean;
           rebuild?: boolean;
+          tui?: boolean;
         },
       ) => {
         try {

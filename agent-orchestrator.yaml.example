@@ -10,6 +10,9 @@ worktreeDir: ~/.worktrees
 # Web dashboard port
 port: 3000
 
+# Dashboard mode: "web" (browser) or "tui" (terminal UI)
+# dashboard: web
+
 # Terminal server ports (defaults: 14800/14801 — chosen to avoid conflicts with dev tools)
 # Override when running multiple dashboards to avoid EADDRINUSE
 # terminalPort: 14800

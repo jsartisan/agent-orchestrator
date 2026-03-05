@@ -4,18 +4,52 @@ import { existsSync } from "node:fs";
 import chalk from "chalk";
 import type { Command } from "commander";
 import { loadConfig } from "@composio/ao-core";
-import { findWebDir, buildDashboardEnv, waitForPortAndOpen } from "../lib/web-dir.js";
+import { findWebDir, findTuiDir, buildDashboardEnv, waitForPortAndOpen } from "../lib/web-dir.js";
 import { cleanNextCache, findRunningDashboardPid, findProcessWebDir, waitForPortFree } from "../lib/dashboard-rebuild.js";
 
 export function registerDashboard(program: Command): void {
   program
     .command("dashboard")
-    .description("Start the web dashboard")
+    .description("Start the web or TUI dashboard")
     .option("-p, --port <port>", "Port to listen on")
     .option("--no-open", "Don't open browser automatically")
     .option("--rebuild", "Clean stale build artifacts and rebuild before starting")
-    .action(async (opts: { port?: string; open?: boolean; rebuild?: boolean }) => {
+    .option("--tui", "Use terminal UI dashboard instead of web dashboard")
+    .action(async (opts: { port?: string; open?: boolean; rebuild?: boolean; tui?: boolean }) => {
       const config = loadConfig();
+      const useTui = opts.tui ?? config.dashboard === "tui";
+
+      if (useTui) {
+        const tuiDir = findTuiDir();
+        if (!existsSync(resolve(tuiDir, "package.json"))) {
+          console.error(chalk.red("Could not find @composio/ao-tui package. Run: pnpm install"));
+          process.exit(1);
+        }
+        if (!existsSync(resolve(tuiDir, "dist/index.js"))) {
+          console.error(chalk.red("@composio/ao-tui is not built. Run: pnpm build"));
+          process.exit(1);
+        }
+
+        const env: Record<string, string> = { ...process.env } as Record<string, string>;
+        if (config.configPath) {
+          env["AO_CONFIG_PATH"] = config.configPath;
+        }
+
+        const child = spawn("node", ["dist/index.js"], {
+          cwd: tuiDir,
+          stdio: "inherit",
+          detached: false,
+          env,
+        });
+        child.on("error", (err) => {
+          console.error(chalk.red("TUI failed to start:"), err.message);
+          process.exit(1);
+        });
+        child.on("exit", (code) => {
+          process.exit(code ?? 0);
+        });
+        return;
+      }
       const port = opts.port ? parseInt(opts.port, 10) : (config.port ?? 3000);
 
       if (isNaN(port) || port < 1 || port > 65535) {
