@@ -24,7 +24,7 @@ export function HelpBar({ view }: HelpBarProps) {
         <Text dimColor>
           <Text bold>Esc/q</Text> back
           {"  "}
-          <Text bold>^B Tab</Text> cycle windows
+          <Text bold>S-Tab</Text> cycle windows
           {"  "}
           <Text bold>t</Text> tmux
           {"  "}
@@ -49,7 +49,7 @@ export function HelpBar({ view }: HelpBarProps) {
         {"  "}
         <Text bold>Enter</Text> details
         {"  "}
-        <Text bold>^B Tab</Text> cycle windows
+        <Text bold>S-Tab</Text> cycle windows
         {"  "}
         <Text bold>t</Text> tmux
         {"  "}

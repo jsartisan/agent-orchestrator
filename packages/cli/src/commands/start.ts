@@ -286,7 +286,7 @@ function startTui(tuiDir: string, configPath: string | null): ChildProcess {
   // Uses prefix key (default Ctrl+B) so bare Tab still works for
   // autocompletion in Claude Code and other programs.
   try {
-    execFileSync("tmux", ["bind-key", "Tab", "switch-client", "-n"], {
+    execFileSync("tmux", ["bind-key", "-n", "BTab", "switch-client", "-n"], {
       timeout: 5_000,
     });
   } catch {
@@ -307,7 +307,7 @@ function startTui(tuiDir: string, configPath: string | null): ChildProcess {
   // Clean up the Tab binding when the TUI exits
   child.on("exit", () => {
     try {
-      execFileSync("tmux", ["unbind-key", "Tab"], {
+      execFileSync("tmux", ["unbind-key", "-n", "BTab"], {
         timeout: 5_000,
         stdio: "ignore",
       });

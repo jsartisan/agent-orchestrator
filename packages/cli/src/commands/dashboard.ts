@@ -82,7 +82,7 @@ export function registerDashboard(program: Command): void {
 
         // Bind Tab at tmux level to cycle sessions from any session
         try {
-          execFileSync("tmux", ["bind-key", "Tab", "switch-client", "-n"], {
+          execFileSync("tmux", ["bind-key", "-n", "BTab", "switch-client", "-n"], {
             timeout: 5_000,
           });
         } catch {
@@ -99,7 +99,7 @@ export function registerDashboard(program: Command): void {
         });
         child.on("exit", (code) => {
           try {
-            execFileSync("tmux", ["unbind-key", "Tab"], {
+            execFileSync("tmux", ["unbind-key", "-n", "BTab"], {
               timeout: 5_000,
               stdio: "ignore",
             });
