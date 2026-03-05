@@ -17,6 +17,8 @@ import { HelpBar } from "./components/help-bar.js";
 import { MessageInput } from "./components/message-input.js";
 import { ConfirmDialog } from "./components/confirm-dialog.js";
 import { FeedbackBar } from "./components/feedback-bar.js";
+import { TmuxTabs } from "./components/tmux-tabs.js";
+import { useTmuxSessions } from "./hooks/use-tmux-sessions.js";
 
 type View = "list" | "detail" | "message" | "confirm-kill" | "confirm-restore";
 
@@ -26,6 +28,7 @@ export function App() {
   const { killSession, sendMessage, restoreSession, actionError, actionSuccess, clearFeedback } =
     useSessionActions();
   const { attach } = useTmuxAttach(refresh);
+  const { sessions: tmuxSessions, currentSession } = useTmuxSessions();
 
   const [view, setView] = useState<View>("list");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -233,6 +236,13 @@ export function App() {
 
       {/* Feedback bar */}
       <FeedbackBar error={actionError} success={actionSuccess} onClear={clearFeedback} />
+
+      {/* Tmux session tabs */}
+      {tmuxSessions.length > 0 && (
+        <Box borderStyle="single" borderBottom={false} borderLeft={false} borderRight={false}>
+          <TmuxTabs sessions={tmuxSessions} currentSession={currentSession} />
+        </Box>
+      )}
 
       {/* Help bar */}
       <Box borderStyle="single" borderTop={false} borderLeft={false} borderRight={false}>
