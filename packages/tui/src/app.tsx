@@ -65,20 +65,6 @@ export function App() {
     ? isTerminal && !NON_RESTORABLE_STATUSES.has(selectedSession.status)
     : false;
 
-  // Build ordered list of tmux targets for Tab cycling
-  const tmuxCycleTargets = useMemo(() => {
-    const targets: string[] = [];
-    if (orchestratorTarget) {
-      targets.push(orchestratorTarget);
-    }
-    for (const s of sortedSessions) {
-      if (s.runtimeTarget && !TERMINAL_STATUSES.has(s.status)) {
-        targets.push(s.runtimeTarget);
-      }
-    }
-    return targets;
-  }, [orchestratorTarget, sortedSessions]);
-
   const handleSendMessage = useCallback(
     (sessionId: string, message: string) => {
       sendMessage(sessionId, message);
@@ -109,9 +95,9 @@ export function App() {
         return;
       }
 
-      // Tab cycles between tmux windows (works in both list and detail views)
-      if (key.tab && tmuxCycleTargets.length > 0) {
-        cycleNext(tmuxCycleTargets);
+      // Tab cycles between all tmux sessions (queries tmux directly)
+      if (key.tab) {
+        cycleNext();
         return;
       }
 

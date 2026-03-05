@@ -1,9 +1,10 @@
 /**
- * Hook that cycles between tmux windows on Tab press.
+ * Hook that cycles between tmux sessions on Tab press.
  *
- * Builds an ordered list of tmux targets:
- *   [TUI window, orchestrator session, ...active worker sessions]
- * and rotates through them using `tmux switch-client`.
+ * Queries tmux directly for all available sessions and rotates
+ * through them using `tmux switch-client`. This works regardless
+ * of whether the session manager knows about the sessions — any
+ * tmux session (orchestrator, workers, manual) is included.
  *
  * Only works when running inside tmux (TMUX env var set).
  */
@@ -19,9 +20,28 @@ function isInsideTmux(): boolean {
 }
 
 /**
- * Returns the current tmux client target session name, or null.
+ * Lists all tmux session names.
  */
-async function getCurrentTmuxTarget(): Promise<string | null> {
+async function listTmuxSessions(): Promise<string[]> {
+  try {
+    const { stdout } = await execFileAsync(
+      "tmux",
+      ["list-sessions", "-F", "#{session_name}"],
+      { timeout: 5_000 },
+    );
+    return stdout
+      .trim()
+      .split("\n")
+      .filter((s) => s.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Returns the current tmux client's session name, or null.
+ */
+async function getCurrentTmuxSession(): Promise<string | null> {
   try {
     const { stdout } = await execFileAsync(
       "tmux",
@@ -35,20 +55,20 @@ async function getCurrentTmuxTarget(): Promise<string | null> {
 }
 
 export interface TmuxCycleState {
-  cycleNext: (targets: string[]) => void;
+  cycleNext: () => void;
 }
 
 /**
- * Cycle to the next tmux session in the given target list.
+ * Cycle to the next tmux session.
  *
- * @param targets - Ordered list of tmux session names to cycle through.
- *   The first entry should be the TUI's own session so we cycle back to it.
+ * Queries tmux for all sessions, finds the current one, and
+ * switches to the next in the list. Wraps around at the end.
  */
 export function useTmuxCycle(): TmuxCycleState {
   const cyclingRef = useRef(false);
 
-  const cycleNext = useCallback((targets: string[]) => {
-    if (!isInsideTmux() || targets.length === 0 || cyclingRef.current) {
+  const cycleNext = useCallback(() => {
+    if (!isInsideTmux() || cyclingRef.current) {
       return;
     }
 
@@ -56,27 +76,19 @@ export function useTmuxCycle(): TmuxCycleState {
 
     void (async () => {
       try {
-        const current = await getCurrentTmuxTarget();
-        let nextIndex = 0;
+        const [sessions, current] = await Promise.all([
+          listTmuxSessions(),
+          getCurrentTmuxSession(),
+        ]);
 
-        if (current) {
-          const currentIndex = targets.indexOf(current);
-          if (currentIndex >= 0) {
-            nextIndex = (currentIndex + 1) % targets.length;
-          }
-        }
+        if (sessions.length < 2) return;
 
-        const next = targets[nextIndex];
+        const currentIndex = current ? sessions.indexOf(current) : -1;
+        const nextIndex = (currentIndex + 1) % sessions.length;
+        const next = sessions[nextIndex];
+
         if (next && next !== current) {
           await execFileAsync("tmux", ["switch-client", "-t", next], {
-            timeout: 5_000,
-          });
-        } else if (next && targets.length > 1) {
-          // Current matches next, advance one more
-          nextIndex = (nextIndex + 1) % targets.length;
-          const nextTarget = targets[nextIndex];
-          if (!nextTarget) return;
-          await execFileAsync("tmux", ["switch-client", "-t", nextTarget], {
             timeout: 5_000,
           });
         }
