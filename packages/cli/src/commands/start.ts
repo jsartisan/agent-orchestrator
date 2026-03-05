@@ -225,7 +225,7 @@ function isInsideTmux(): boolean {
  * existing tmux context). Otherwise, creates a new tmux session
  * for the TUI and attaches to it.
  */
-function startTui(tuiDir: string, configPath: string | null): ChildProcess {
+function startTui(tuiDir: string, configPath: string | null, sessionPrefix?: string): ChildProcess {
   const env: Record<string, string> = { ...process.env } as Record<string, string>;
   if (configPath) {
     env["AO_CONFIG_PATH"] = configPath;
@@ -282,11 +282,23 @@ function startTui(tuiDir: string, configPath: string | null): ChildProcess {
     { timeout: 10_000 },
   );
 
-  // Bind prefix+Tab at the tmux level to cycle sessions from anywhere.
-  // Uses prefix key (default Ctrl+B) so bare Tab still works for
-  // autocompletion in Claude Code and other programs.
+  // Bind Shift+Tab at the tmux level to cycle only ao sessions.
+  // Uses a shell command that filters sessions by prefix so unrelated
+  // tmux sessions are not included in the rotation.
+  const prefix = sessionPrefix ?? "ao";
+  const cycleCmd =
+    `cur=$(tmux display-message -p "#{session_name}"); ` +
+    `sessions=$(tmux list-sessions -F "#{session_name}" | grep -E "^(${TUI_TMUX_SESSION}|${prefix}-)" | tr "\\n" " "); ` +
+    `set -- $sessions; ` +
+    `found=0; first=""; ` +
+    `for s; do ` +
+    `  [ -z "$first" ] && first="$s"; ` +
+    `  if [ "$found" = 1 ]; then tmux switch-client -t "$s"; exit 0; fi; ` +
+    `  [ "$s" = "$cur" ] && found=1; ` +
+    `done; ` +
+    `[ -n "$first" ] && tmux switch-client -t "$first"`;
   try {
-    execFileSync("tmux", ["bind-key", "-n", "BTab", "switch-client", "-n"], {
+    execFileSync("tmux", ["bind-key", "-n", "BTab", "run-shell", cycleCmd], {
       timeout: 5_000,
     });
   } catch {
@@ -402,7 +414,7 @@ async function runStartup(
     }
 
     console.log(chalk.bold.green("\nLaunching TUI dashboard...\n"));
-    dashboardProcess = startTui(tuiDir, config.configPath);
+    dashboardProcess = startTui(tuiDir, config.configPath, project.sessionPrefix);
     dashboardProcess.on("exit", (code) => {
       process.exit(code ?? 0);
     });

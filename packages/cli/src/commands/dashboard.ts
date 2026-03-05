@@ -80,9 +80,26 @@ export function registerDashboard(program: Command): void {
           { timeout: 10_000 },
         );
 
-        // Bind Tab at tmux level to cycle sessions from any session
+        // Bind Shift+Tab to cycle only ao sessions for this project
+        const prefixes = Object.values(config.projects)
+          .map((p) => p.sessionPrefix)
+          .filter(Boolean);
+        const prefixPattern = prefixes.length > 0
+          ? prefixes.join("-|") + "-"
+          : "ao-";
+        const cycleCmd =
+          `cur=$(tmux display-message -p "#{session_name}"); ` +
+          `sessions=$(tmux list-sessions -F "#{session_name}" | grep -E "^(${tuiSessionName}|${prefixPattern})" | tr "\\n" " "); ` +
+          `set -- $sessions; ` +
+          `found=0; first=""; ` +
+          `for s; do ` +
+          `  [ -z "$first" ] && first="$s"; ` +
+          `  if [ "$found" = 1 ]; then tmux switch-client -t "$s"; exit 0; fi; ` +
+          `  [ "$s" = "$cur" ] && found=1; ` +
+          `done; ` +
+          `[ -n "$first" ] && tmux switch-client -t "$first"`;
         try {
-          execFileSync("tmux", ["bind-key", "-n", "BTab", "switch-client", "-n"], {
+          execFileSync("tmux", ["bind-key", "-n", "BTab", "run-shell", cycleCmd], {
             timeout: 5_000,
           });
         } catch {
