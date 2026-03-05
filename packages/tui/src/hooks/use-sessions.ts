@@ -23,6 +23,7 @@ export interface SessionsState {
   sessions: DashboardSession[];
   stats: DashboardStats;
   orchestratorId: string | null;
+  orchestratorTarget: string | null;
   loading: boolean;
   error: string | null;
   refresh: () => void;
@@ -37,6 +38,7 @@ export function useSessions(): SessionsState {
     needsReview: 0,
   });
   const [orchestratorId, setOrchestratorId] = useState<string | null>(null);
+  const [orchestratorTarget, setOrchestratorTarget] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const fetchingRef = useRef(false);
@@ -51,6 +53,7 @@ export function useSessions(): SessionsState {
 
       const orchSession = coreSessions.find((s: Session) => s.id.endsWith("-orchestrator"));
       setOrchestratorId(orchSession ? orchSession.id : null);
+      setOrchestratorTarget(orchSession?.runtimeHandle?.id ?? null);
 
       const workerSessions = coreSessions.filter((s: Session) => !s.id.endsWith("-orchestrator"));
       const dashboardSessions = workerSessions.map(sessionToDashboard);
@@ -94,6 +97,7 @@ export function useSessions(): SessionsState {
     sessions,
     stats,
     orchestratorId,
+    orchestratorTarget,
     loading,
     error,
     refresh: fetchSessions,

@@ -55,6 +55,8 @@ export interface DashboardSession {
   lastActivityAt: string;
   pr: DashboardPR | null;
   metadata: Record<string, string>;
+  /** Runtime handle ID (e.g. tmux session name) for attaching */
+  runtimeTarget: string | null;
 }
 
 export interface DashboardPR {

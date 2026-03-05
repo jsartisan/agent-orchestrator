@@ -9,6 +9,7 @@ import {
 } from "./lib/types.js";
 import { useSessions } from "./hooks/use-sessions.js";
 import { useSessionActions } from "./hooks/use-session-actions.js";
+import { useTmuxAttach } from "./hooks/use-tmux-attach.js";
 import { StatusBar } from "./components/status-bar.js";
 import { SessionTable } from "./components/session-table.js";
 import { SessionDetail } from "./components/session-detail.js";
@@ -21,9 +22,10 @@ type View = "list" | "detail" | "message" | "confirm-kill" | "confirm-restore";
 
 export function App() {
   const { exit } = useApp();
-  const { sessions, stats, loading, error: loadError, refresh } = useSessions();
+  const { sessions, stats, orchestratorTarget, loading, error: loadError, refresh } = useSessions();
   const { killSession, sendMessage, restoreSession, actionError, actionSuccess, clearFeedback } =
     useSessionActions();
+  const { attach } = useTmuxAttach(refresh);
 
   const [view, setView] = useState<View>("list");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -108,6 +110,14 @@ export function App() {
           setView("detail");
           return;
         }
+        if (input === "o" && orchestratorTarget) {
+          attach(orchestratorTarget);
+          return;
+        }
+        if (input === "t" && selectedSession?.runtimeTarget) {
+          attach(selectedSession.runtimeTarget);
+          return;
+        }
         if (input === "m" && selectedSession && !isTerminal) {
           setView("message");
           return;
@@ -129,6 +139,14 @@ export function App() {
       if (view === "detail") {
         if (input === "q" || key.escape) {
           setView("list");
+          return;
+        }
+        if (input === "o" && orchestratorTarget) {
+          attach(orchestratorTarget);
+          return;
+        }
+        if (input === "t" && selectedSession?.runtimeTarget) {
+          attach(selectedSession.runtimeTarget);
           return;
         }
         if (input === "m" && selectedSession && !isTerminal) {

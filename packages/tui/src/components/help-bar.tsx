@@ -24,6 +24,10 @@ export function HelpBar({ view }: HelpBarProps) {
         <Text dimColor>
           <Text bold>Esc/q</Text> back
           {"  "}
+          <Text bold>t</Text> tmux
+          {"  "}
+          <Text bold>o</Text> orchestrator
+          {"  "}
           <Text bold>m</Text> message
           {"  "}
           <Text bold>k</Text> kill
@@ -42,6 +46,10 @@ export function HelpBar({ view }: HelpBarProps) {
         <Text bold>j/k</Text> navigate
         {"  "}
         <Text bold>Enter</Text> details
+        {"  "}
+        <Text bold>t</Text> tmux
+        {"  "}
+        <Text bold>o</Text> orchestrator
         {"  "}
         <Text bold>m</Text> message
         {"  "}
