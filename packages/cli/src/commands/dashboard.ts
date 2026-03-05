@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
 import chalk from "chalk";
@@ -35,11 +35,54 @@ export function registerDashboard(program: Command): void {
           env["AO_CONFIG_PATH"] = config.configPath;
         }
 
-        const child = spawn("node", ["dist/index.js"], {
-          cwd: tuiDir,
+        const tuiSessionName = "ao-tui";
+
+        if (process.env["TMUX"]) {
+          // Already in tmux — run TUI directly
+          const child = spawn("node", ["dist/index.js"], {
+            cwd: tuiDir,
+            stdio: "inherit",
+            detached: false,
+            env,
+          });
+          child.on("error", (err) => {
+            console.error(chalk.red("TUI failed to start:"), err.message);
+            process.exit(1);
+          });
+          child.on("exit", (code) => {
+            process.exit(code ?? 0);
+          });
+          return;
+        }
+
+        // Not in tmux — launch TUI inside a tmux session for Tab cycling
+        const tuiEntrypoint = resolve(tuiDir, "dist/index.js");
+
+        // Kill stale TUI session if it exists
+        try {
+          execFileSync("tmux", ["kill-session", "-t", tuiSessionName], {
+            timeout: 5_000,
+            stdio: "ignore",
+          });
+        } catch {
+          // Session didn't exist
+        }
+
+        // Build tmux env args
+        const envArgs: string[] = [];
+        if (config.configPath) {
+          envArgs.push("-e", `AO_CONFIG_PATH=${config.configPath}`);
+        }
+
+        execFileSync(
+          "tmux",
+          ["new-session", "-d", "-s", tuiSessionName, ...envArgs, "node", tuiEntrypoint],
+          { timeout: 10_000 },
+        );
+
+        const child = spawn("tmux", ["attach-session", "-t", tuiSessionName], {
           stdio: "inherit",
           detached: false,
-          env,
         });
         child.on("error", (err) => {
           console.error(chalk.red("TUI failed to start:"), err.message);
