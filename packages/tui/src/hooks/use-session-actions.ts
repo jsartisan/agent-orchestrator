@@ -1,14 +1,17 @@
 /**
- * Hook for session actions: kill, send message, restore.
+ * Hook for session actions: kill, send message, restore, merge.
  */
 
 import { useState, useCallback } from "react";
-import { getServices } from "../lib/services.js";
+import type { MergeMethod, SCM, ProjectConfig } from "@composio/ao-core";
+import { getServices, getSCM } from "../lib/services.js";
+import { resolveProject } from "../lib/serialize.js";
 
 export interface SessionActions {
   killSession: (sessionId: string) => Promise<void>;
   sendMessage: (sessionId: string, message: string) => Promise<void>;
   restoreSession: (sessionId: string) => Promise<void>;
+  mergeSession: (sessionId: string, method: MergeMethod) => Promise<void>;
   actionError: string | null;
   actionSuccess: string | null;
   clearFeedback: () => void;
@@ -65,10 +68,38 @@ export function useSessionActions(): SessionActions {
     }
   }, []);
 
+  const mergeSession = useCallback(async (sessionId: string, method: MergeMethod) => {
+    try {
+      const { config, registry, sessionManager } = getServices();
+      const session = await sessionManager.get(sessionId);
+      if (!session) {
+        setActionError(`Session ${sessionId} not found`);
+        return;
+      }
+      if (!session.pr) {
+        setActionError(`Session ${sessionId} has no PR`);
+        return;
+      }
+      const project: ProjectConfig | undefined = resolveProject(session, config.projects);
+      const scm: SCM | null = getSCM(registry, project);
+      if (!scm) {
+        setActionError("No SCM plugin configured for this project");
+        return;
+      }
+      await scm.mergePR(session.pr, method);
+      setActionSuccess(`Merged PR #${session.pr.number} (${method})`);
+      setActionError(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : `Failed to merge PR for ${sessionId}`);
+      setActionSuccess(null);
+    }
+  }, []);
+
   return {
     killSession,
     sendMessage,
     restoreSession,
+    mergeSession,
     actionError,
     actionSuccess,
     clearFeedback,
