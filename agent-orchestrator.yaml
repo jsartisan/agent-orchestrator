@@ -11,11 +11,11 @@ defaults:
 
 projects:
   ao:
-    name: Agent Orchestrator
-    repo: ComposioHQ/agent-orchestrator
-    path: ~/agent-orchestrator
+    name: Opera
+    repo: jsartisan/agent-orchestrator
+    path: ~/Sites/agent-orchestrator
     defaultBranch: main
-    sessionPrefix: ao
+    sessionPrefix: opera
     scm:
       plugin: github
     tracker:
