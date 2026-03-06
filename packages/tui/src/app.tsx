@@ -4,6 +4,7 @@ import {
   type DashboardSession,
   type AttentionLevel,
   getAttentionLevel,
+  isPRMergeReady,
   TERMINAL_STATUSES,
   NON_RESTORABLE_STATUSES,
 } from "./lib/types.js";
@@ -17,15 +18,19 @@ import { HelpBar } from "./components/help-bar.js";
 import { MessageInput } from "./components/message-input.js";
 import { ConfirmDialog } from "./components/confirm-dialog.js";
 import { FeedbackBar } from "./components/feedback-bar.js";
+import { MergeDialog, type MergeMethod } from "./components/merge-dialog.js";
+import { TmuxTabs } from "./components/tmux-tabs.js";
+import { useTmuxSessions } from "./hooks/use-tmux-sessions.js";
 
-type View = "list" | "detail" | "message" | "confirm-kill" | "confirm-restore";
+type View = "list" | "detail" | "message" | "confirm-kill" | "confirm-restore" | "confirm-merge";
 
 export function App() {
   const { exit } = useApp();
   const { sessions, stats, orchestratorTarget, loading, error: loadError, refresh } = useSessions();
-  const { killSession, sendMessage, restoreSession, actionError, actionSuccess, clearFeedback } =
+  const { killSession, sendMessage, restoreSession, mergeSession, actionError, actionSuccess, clearFeedback } =
     useSessionActions();
   const { attach } = useTmuxAttach(refresh);
+  const { sessions: tmuxSessions, currentSession } = useTmuxSessions();
 
   const [view, setView] = useState<View>("list");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -63,6 +68,8 @@ export function App() {
     ? isTerminal && !NON_RESTORABLE_STATUSES.has(selectedSession.status)
     : false;
 
+  const isMergeReady = selectedSession?.pr ? isPRMergeReady(selectedSession.pr) : false;
+
   const handleSendMessage = useCallback(
     (sessionId: string, message: string) => {
       sendMessage(sessionId, message);
@@ -86,10 +93,20 @@ export function App() {
     setView("list");
   }, [selectedSession, restoreSession, refresh]);
 
+  const handleMergeConfirm = useCallback(
+    (method: MergeMethod) => {
+      if (selectedSession) {
+        void mergeSession(selectedSession.id, method).then(() => refresh());
+      }
+      setView("list");
+    },
+    [selectedSession, mergeSession, refresh],
+  );
+
   // Keyboard navigation
   useInput(
     (input, key) => {
-      if (view === "message" || view === "confirm-kill" || view === "confirm-restore") {
+      if (view === "message" || view === "confirm-kill" || view === "confirm-restore" || view === "confirm-merge") {
         return;
       }
 
@@ -130,6 +147,10 @@ export function App() {
           setView("confirm-restore");
           return;
         }
+        if (input === "M" && selectedSession && isMergeReady) {
+          setView("confirm-merge");
+          return;
+        }
         if (input === "r") {
           refresh();
           return;
@@ -161,6 +182,10 @@ export function App() {
           setView("confirm-restore");
           return;
         }
+        if (input === "M" && selectedSession && isMergeReady) {
+          setView("confirm-merge");
+          return;
+        }
         if (input === "r") {
           refresh();
           return;
@@ -168,7 +193,7 @@ export function App() {
       }
     },
     {
-      isActive: view !== "message" && view !== "confirm-kill" && view !== "confirm-restore",
+      isActive: view !== "message" && view !== "confirm-kill" && view !== "confirm-restore" && view !== "confirm-merge",
     },
   );
 
@@ -229,14 +254,29 @@ export function App() {
             onCancel={() => setView("list")}
           />
         )}
+
+        {view === "confirm-merge" && selectedSession?.pr && (
+          <MergeDialog
+            pr={selectedSession.pr}
+            onConfirm={handleMergeConfirm}
+            onCancel={() => setView("list")}
+          />
+        )}
       </Box>
 
       {/* Feedback bar */}
       <FeedbackBar error={actionError} success={actionSuccess} onClear={clearFeedback} />
 
+      {/* Tmux session tabs */}
+      {tmuxSessions.length > 0 && (
+        <Box borderStyle="single" borderBottom={false} borderLeft={false} borderRight={false}>
+          <TmuxTabs sessions={tmuxSessions} currentSession={currentSession} />
+        </Box>
+      )}
+
       {/* Help bar */}
       <Box borderStyle="single" borderTop={false} borderLeft={false} borderRight={false}>
-        <HelpBar view={helpView} />
+        <HelpBar view={helpView} mergeAvailable={isMergeReady} />
       </Box>
     </Box>
   );

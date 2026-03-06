@@ -3,9 +3,10 @@ import { Box, Text } from "ink";
 
 interface HelpBarProps {
   view: "list" | "detail" | "message";
+  mergeAvailable?: boolean;
 }
 
-export function HelpBar({ view }: HelpBarProps) {
+export function HelpBar({ view, mergeAvailable }: HelpBarProps) {
   if (view === "message") {
     return (
       <Box paddingX={1}>
@@ -36,6 +37,12 @@ export function HelpBar({ view }: HelpBarProps) {
           {"  "}
           <Text bold>R</Text> restore
           {"  "}
+          {mergeAvailable && (
+            <>
+              <Text bold color="green">M</Text>{" merge"}
+              {"  "}
+            </>
+          )}
           <Text bold>r</Text> refresh
         </Text>
       </Box>
@@ -61,6 +68,12 @@ export function HelpBar({ view }: HelpBarProps) {
         {"  "}
         <Text bold>R</Text> restore
         {"  "}
+        {mergeAvailable && (
+          <>
+            <Text bold color="green">M</Text>{" merge"}
+            {"  "}
+          </>
+        )}
         <Text bold>r</Text> refresh
         {"  "}
         <Text bold>q</Text> quit
